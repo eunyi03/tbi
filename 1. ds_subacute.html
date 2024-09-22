@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js 산점도</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .tooltip {   
+            position: absolute;           
+            text-align: center;           
+            width: 100px;                  
+            height: 28px;                 
+            padding: 2px;             
+            font: 12px sans-serif;        
+            background: lightsteelblue;   
+            border: 0px;      
+            border-radius: 8px;           
+            pointer-events: none;         
+        }
+    </style>
+</head>
+<body>
+    <h2>Subacute -log10(padj) vs Subacute NP_score 산점도</h2>
+    <div id="scatterplot"></div>
+
+    <script>
+        // 그래프의 크기와 여백 설정
+        var margin = {top: 50, right: 30, bottom: 50, left: 80},
+            width = 800 - margin.left - margin.right,
+            height = 600 - margin.top - margin.bottom;
+
+        // SVG 객체를 페이지에 추가
+        var svg = d3.select("#scatterplot")
+          .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        // 데이터를 JSON 파일에서 불러오기
+        d3.json("output_np_subacute.json").then(function(data) {
+
+            // X축 추가
+            var x = d3.scaleLinear()
+              .domain([0, 35])  // X축 범위 설정
+              .range([ 0, width ]);
+
+            svg.append("g")
+              .attr("transform", "translate(0," + height + ")")
+              .call(d3.axisBottom(x));
+
+            // Y축 추가 (np_score 범위를 0.010부터 시작하게 설정)
+            var y = d3.scaleLinear()
+              .domain([0.010, d3.max(data, function(d) { return +d.np_score; }) + 0.005])  // Y축 범위 설정
+              .range([ height, 0 ]);
+
+            svg.append("g")
+              .call(d3.axisLeft(y));
+
+            // 데이터를 색상 순서대로 그리기 (gray -> blue -> red 순서)
+            
+            // gray points
+            svg.append('g')
+              .selectAll("circle.gray")
+              .data(data.filter(function(d) { return d.color === "gray"; }))
+              .enter()
+              .append("circle")
+                .attr("cx", function (d) { return x(d.Subacute_log10_padj); })
+                .attr("cy", function (d) { return y(d.np_score); })
+                .attr("r", 3)
+                .style("fill", "gray");
+
+            // blue points
+            svg.append('g')
+              .selectAll("circle.blue")
+              .data(data.filter(function(d) { return d.color === "blue"; }))
+              .enter()
+              .append("circle")
+                .attr("cx", function (d) { return x(d.Subacute_log10_padj); })
+                .attr("cy", function (d) { return y(d.np_score); })
+                .attr("r", 3)
+                .style("fill", "blue");
+
+            // red points
+            svg.append('g')
+              .selectAll("circle.red")
+              .data(data.filter(function(d) { return d.color === "red"; }))
+              .enter()
+              .append("circle")
+                .attr("cx", function (d) { return x(d.Subacute_log10_padj); })
+                .attr("cy", function (d) { return y(d.np_score); })
+                .attr("r", 3)
+                .style("fill", "red");
+
+            // 툴팁 생성
+            var tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+
+            // 툴팁 및 마우스 이벤트 추가
+            svg.selectAll("circle")
+                .on("mouseover", function(event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html("Gene: " + d.gene + "<br/>Score: " + d.np_score)
+                        .style("left", (event.pageX) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // X축 라벨 중앙에 배치
+            svg.append("text")
+                .attr("text-anchor", "middle")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom - 10)
+                .style("font-size", "18px")
+                .text("Subacute -log10(padj)");
+
+            // Y축 라벨 중앙에 배치
+            svg.append("text")
+                .attr("text-anchor", "middle")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -(height / 2))
+                .attr("y", -margin.left + 20)
+                .style("font-size", "18px")
+                .text("Network Propagation Score");
+
+            // 범례 추가 (red, blue만 표시)
+            var legend = svg.selectAll(".legend")
+                .data(["red", "blue"])
+                .enter().append("g")
+                .attr("class", "legend")
+                .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+            // 범례 색상 사각형 추가
+            legend.append("rect")
+                .attr("x", width - 18)
+                .attr("width", 18)
+                .attr("height", 18)
+                .style("fill", function(d) { return d; });
+
+            // 범례 텍스트 추가
+            legend.append("text")
+                .attr("x", width - 24)
+                .attr("y", 9)
+                .attr("dy", ".35em")
+                .style("text-anchor", "end")
+                .style("font-size", "14px")
+                .text(function(d) {
+                    if (d === "red") return "subacute_up_deg";
+                    else if (d === "blue") return "subacute_down_deg";
+                });
+        });
+    </script>
+</body>
+</html>
